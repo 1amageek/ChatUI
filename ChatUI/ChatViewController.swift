@@ -58,12 +58,6 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        realm = try! Realm()
-        self.notificationToken = realm.addNotificationBlock({ (notification, realm) in
-            self.collectionView.reloadData()
-        })
-        transcripts = realm.objects(Transcript).sorted("createdAt")
         self.inputToolbar.setItems([self.sendBarButtonItem], animated: false)
     }
     
@@ -79,6 +73,12 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
         layoutInputToolbar()
         let bottom: CGFloat = inputToolbar.bounds.height + keyboardHeight
         collectionView.contentInset = UIEdgeInsets(top: collectionView.contentInset.top, left: 0, bottom: bottom, right: 0)
+        scrollToBottom(false)
+    }
+    
+    override func viewDidDisappear(animated: Bool) {
+        super.viewDidDisappear(animated)
+        NSNotificationCenter.defaultCenter().removeObserver(self)
     }
 
     override func didReceiveMemoryWarning() {
@@ -127,7 +127,7 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
     }
     
     func collectionView(collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumLineSpacingForSectionAtIndex section: Int) -> CGFloat {
-        return 6
+        return 3
     }
     
     func collectionView(collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAtIndex section: Int) -> CGFloat {
@@ -135,13 +135,18 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
     }
     
     func collectionView(collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAtIndex section: Int) -> UIEdgeInsets {
-        return UIEdgeInsetsZero
+        return UIEdgeInsets(top: 6, left: 0, bottom: 6, right: 0)
+    }
+    
+    func scrollViewWillBeginDragging(scrollView: UIScrollView) {
+        inputToolbar.composeTextView.resignFirstResponder()
     }
     
     // MARK: - Action
     
     func tappedSendButton(barButtonItem: UIBarButtonItem) {
         let text = inputToolbar.composeTextView.text
+        inputToolbar.composeTextView.text = ""
         if !text.isEmpty {
             let transcript = Transcript()
             transcript.from = "FROM"
@@ -192,15 +197,49 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
             animationDuration = _animatinDuration.doubleValue
         }
         let inputToolbarOriginY = self.view.bounds.height - self.inputToolbar.bounds.height - keyboardHeight
-        
+        let bottom: CGFloat = inputToolbar.bounds.height + keyboardHeight
+        let contentOffset = CGPoint(x: 0, y: self.collectionView.contentSize.height - self.collectionView.bounds.height + bottom)
+    
         // Animation
         UIView.beginAnimations(nil, context: nil)
         UIView.setAnimationDuration(animationDuration!)
         UIView.setAnimationCurve(animationCurve!)
         self.inputToolbar.frame = CGRect(x: self.inputToolbar.bounds.origin.x, y: inputToolbarOriginY, width: self.inputToolbar.bounds.width, height: self.inputToolbar.bounds.height)
-        let bottom: CGFloat = inputToolbar.bounds.height + keyboardHeight
         self.collectionView.contentInset = UIEdgeInsets(top: self.collectionView.contentInset.top, left: 0, bottom: bottom, right: 0)
+        if up {
+            if shouldScrollToBottom() {
+                self.collectionView.setContentOffset(contentOffset, animated: false)
+            }
+        }
         UIView.commitAnimations()
+    }
+    
+    func shouldScrollToBottom() -> Bool {
+        if collectionView.bounds.height > collectionView.contentSize.height {
+            return false
+        }
+        let section: Int = self.numberOfSectionsInCollectionView(self.collectionView) - 1
+        if section < 0 {
+            return false
+        }
+        let item: Int = self.collectionView(self.collectionView, numberOfItemsInSection: section) - 1
+        if item < 0 {
+            return false
+        }
+        let indexPath: NSIndexPath = NSIndexPath(forItem: item, inSection: section)
+        if let layoutAttributes: UICollectionViewLayoutAttributes = self.collectionView.collectionViewLayout.layoutAttributesForItemAtIndexPath(indexPath) {
+            let visibleRect: CGRect = CGRect(x: 0, y: self.collectionView.contentOffset.y, width: collectionView.bounds.width, height: collectionView.bounds.height)
+            if CGRectIntersectsRect(layoutAttributes.frame, visibleRect) {
+                return true
+            }
+        }
+        return false
+    }
+    
+    func scrollToBottom(animated: Bool) {
+        let bottom: CGFloat = inputToolbar.bounds.height + keyboardHeight
+        let contentOffset = CGPoint(x: 0, y: self.collectionView.contentSize.height - self.collectionView.bounds.height + bottom)
+        self.collectionView.setContentOffset(contentOffset, animated: animated)
     }
     
     func layoutInputToolbar() {
@@ -210,9 +249,39 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
     }
     
     // MARK: - Realm
-    var notificationToken: NotificationToken?
-    var realm: Realm!
-    var transcripts: Results<Transcript>!
     
+    private(set) var notificationToken: NotificationToken?
+    
+    private(set) lazy var realm: Realm = {
+        var realm = try! Realm()
+        self.notificationToken = realm.addNotificationBlock({ (notification, realm) in
+            let section: Int = self.numberOfSectionsInCollectionView(self.collectionView) - 1
+            let item: Int = self.collectionView(self.collectionView, numberOfItemsInSection: section) - 1
+            let indexPath: NSIndexPath = NSIndexPath(forItem: item, inSection: section)
+            self.collectionView.performBatchUpdates({
+                self.collectionView.insertItemsAtIndexPaths([indexPath])
+                }, completion: nil)
+            let layoutAttributes: UICollectionViewLayoutAttributes = self.collectionView.layoutAttributesForItemAtIndexPath(indexPath)!
+            let contentInset: UIEdgeInsets = self.collectionView(self.collectionView, layout: self.collectionView.collectionViewLayout, insetForSectionAtIndex: section)
+            let bottom: CGFloat = self.inputToolbar.bounds.height + self.keyboardHeight
+            let contentOffset = CGPoint(x: 0, y: CGRectGetMaxY(layoutAttributes.frame) + contentInset.bottom - self.collectionView.bounds.height + bottom)
+            UIView.animateWithDuration(0.2) {
+                self.collectionView.contentOffset = contentOffset
+            }
+        })
+        return realm
+    }()
+    
+    private(set) lazy var transcripts: Results<Transcript> = {
+        var transcripts = self.realm.objects(Transcript).sorted("createdAt")
+        return transcripts
+    }()
+    
+    // MARK: - 
+//    deinit {
+//        if let notificationToken = self.notificationToken {
+//            self.realm.removeNotification(notificationToken)
+//        }
+//    }
     
 }

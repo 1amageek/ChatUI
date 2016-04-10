@@ -63,6 +63,15 @@ class ChatToolbar: UIView {
         self.bounds = CGRect(x: 0, y: 0, width: self.bounds.width, height: CGRectGetMaxY(toolbar.frame))
     }
     
+    override func drawRect(rect: CGRect) {
+        let line = UIBezierPath()
+        line.moveToPoint(rect.origin)
+        line.addLineToPoint(CGPoint(x: rect.width, y: rect.origin.y))
+        UIColor.lightGrayColor().setStroke()
+        line.lineWidth = 1
+        line.stroke()
+    }
+    
 }
 
 class _Toolbar: UIToolbar {
