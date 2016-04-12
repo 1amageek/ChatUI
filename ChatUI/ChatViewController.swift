@@ -9,7 +9,13 @@
 import UIKit
 import RealmSwift
 
-class ChatViewController: UIViewController, UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UITextViewDelegate {
+class ChatViewController: UIViewController, UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UITextViewDelegate, ChatSessionControllerDelegate {
+    
+    var sessionController: ChatSessionController? {
+        didSet {
+            sessionController?.delegate = self
+        }
+    }
     
     private(set) lazy var collectionView: UICollectionView = {
         let collectionViewLayout = UICollectionViewFlowLayout()
@@ -101,6 +107,7 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
         case ContentType.Text.rawValue:
             let cell: ChatTextViewCell = collectionView.dequeueReusableCellWithReuseIdentifier("ChatTextViewCell", forIndexPath: indexPath) as! ChatTextViewCell
             cell.message = transcript.text
+            cell.direction = transcript.from == "FROM" ? .Right : .Left
             return cell
         default:
             let cell: ChatViewCell = collectionView.dequeueReusableCellWithReuseIdentifier("ChatViewCell", forIndexPath: indexPath) as! ChatViewCell
@@ -119,6 +126,7 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
         case ContentType.Text.rawValue:
             let cell: ChatTextViewCell = ChatTextViewCell(frame: self.view.bounds)
             cell.message = transcript.text
+            cell.direction = transcript.from == "FROM" ? .Right : .Left
             return cell.calculateSize()
         default:
             let cell: ChatViewCell = ChatViewCell(frame: self.view.bounds)
@@ -147,6 +155,7 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
     func tappedSendButton(barButtonItem: UIBarButtonItem) {
         let text = inputToolbar.composeTextView.text
         inputToolbar.composeTextView.text = ""
+        barButtonItem.enabled = false
         if !text.isEmpty {
             let transcript = Transcript()
             transcript.from = "FROM"
@@ -156,6 +165,7 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
             try! realm.write({
                 realm.add(transcript)
             })
+            sessionController?.sendContent(transcript)
         }
     }
     
@@ -206,6 +216,8 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
         UIView.setAnimationCurve(animationCurve!)
         self.inputToolbar.frame = CGRect(x: self.inputToolbar.bounds.origin.x, y: inputToolbarOriginY, width: self.inputToolbar.bounds.width, height: self.inputToolbar.bounds.height)
         self.collectionView.contentInset = UIEdgeInsets(top: self.collectionView.contentInset.top, left: 0, bottom: bottom, right: 0)
+        
+        // TODO bug http://stackoverflow.com/questions/22389904/animating-uicollectionview-contentoffset-does-not-display-non-visible-cells
         if up {
             if shouldScrollToBottom() {
                 self.collectionView.setContentOffset(contentOffset, animated: false)
@@ -278,10 +290,19 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
     }()
     
     // MARK: - 
-//    deinit {
-//        if let notificationToken = self.notificationToken {
-//            self.realm.removeNotification(notificationToken)
-//        }
-//    }
+    
+    func controller(controller: ChatSessionController, didReceiveContent transcript: Transcript) {
+        try! realm.write({
+            realm.add(transcript)
+        })
+    }
+    
+    // MARK: -
+    
+    deinit {
+        if let notificationToken = self.notificationToken {
+            self.realm.removeNotification(notificationToken)
+        }
+    }
     
 }
