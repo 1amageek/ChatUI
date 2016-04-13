@@ -17,12 +17,13 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
         }
     }
     
-    private(set) lazy var collectionView: UICollectionView = {
+    private(set) lazy var collectionView: ChatView = {
         let collectionViewLayout = UICollectionViewFlowLayout()
         collectionViewLayout.scrollDirection = UICollectionViewScrollDirection.Vertical
-        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: collectionViewLayout)
+        let collectionView = ChatView(frame: .zero, collectionViewLayout: collectionViewLayout)
         collectionView.backgroundColor = UIColor.whiteColor()
         collectionView.alwaysBounceVertical = true
+        collectionView.allowsSelection = true
         collectionView.delegate = self
         collectionView.dataSource = self
         collectionView.keyboardDismissMode = .OnDrag
@@ -54,6 +55,8 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
         self.view.backgroundColor = UIColor.whiteColor()
         self.view.addSubview(self.collectionView)
         self.view.addSubview(self.inputToolbar)
+//        self.collectionView.addGestureRecognizer(self.panGestureRecognizer)
+//        self.panGestureRecognizer.requireGestureRecognizerToFail(self.collectionView.panGestureRecognizer)
     }
     
     private(set) lazy var sendBarButtonItem: UIBarButtonItem = {
@@ -109,7 +112,8 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
             let cell: ChatTextViewCell = collectionView.dequeueReusableCellWithReuseIdentifier("ChatTextViewCell", forIndexPath: indexPath) as! ChatTextViewCell
             cell.message = transcript.text
             cell.direction = direction
-            cell.balloonViewColor = direction == .Right ? UIColor(red: 71/255, green: 139/255, blue: 242/255, alpha: 1) : UIColor.lightGrayColor()
+            cell.balloonViewColor = direction == .Right ? UIColor(red: 71/255, green: 139/255, blue: 242/255, alpha: 1) : UIColor(red: 0.9, green: 0.9, blue: 0.9, alpha: 1)
+            cell.messageLabelTextColor = direction == .Right ? UIColor.whiteColor() : UIColor.blackColor()
             
             return cell
         default:
@@ -119,6 +123,10 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
     }
     
     // MARK: - UICollectionViewDelegate
+    
+    func collectionView(collectionView: UICollectionView, didSelectItemAtIndexPath indexPath: NSIndexPath) {
+        
+    }
     
     
     // MARK: - UICollectionViewFlowLayout
@@ -230,6 +238,8 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
         UIView.commitAnimations()
     }
     
+    // MARK: - CollectionView offset control
+    
     func shouldScrollToBottom() -> Bool {
         if collectionView.bounds.height > collectionView.contentSize.height {
             return false
@@ -315,7 +325,18 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
         return transcripts
     }()
     
-    // MARK: - 
+    // MARK: - Gesture control
+    
+    private(set) lazy var panGestureRecognizer: UIPanGestureRecognizer = {
+        var panGestureRecognizer = UIPanGestureRecognizer(target: self, action: #selector(ChatViewController.panGesture(_:)))
+        return panGestureRecognizer
+    }()
+    
+    func panGesture(recognizer: UIPanGestureRecognizer) {
+        print(recognizer)
+    }
+    
+    // MARK: - ChatSessionControllerDelegate
     
     func controller(controller: ChatSessionController, didReceiveContent transcript: Transcript) {
         try! realm.write({
