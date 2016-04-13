@@ -25,6 +25,13 @@ class ChatViewCell: UICollectionViewCell {
     
     var direction: Direction!
     
+    var balloonViewColor: UIColor = UIColor(red: 0.0, green: 0.1, blue: 1, alpha: 1) {
+        didSet {
+            balloonView.backgroundColor = balloonViewColor
+            balloonView.setNeedsDisplay()
+        }
+    }
+    
     var dateLabelHidden: Bool = true {
         didSet {
             dateLabel.hidden = dateLabelHidden
@@ -34,7 +41,8 @@ class ChatViewCell: UICollectionViewCell {
 
     private(set) lazy var balloonView: UIView = {
         var balloonView = UIView(frame: .zero)
-        balloonView.backgroundColor = UIColor(red: 0.8, green: 0.8, blue: 0.8, alpha: 1)
+        balloonView.backgroundColor = self.balloonViewColor
+        balloonView.layer.cornerRadius = 14
         return balloonView
     }()
     
@@ -87,30 +95,35 @@ class ChatTextViewCell: ChatViewCell {
         fatalError("init(coder:) has not been implemented")
     }
     
+    var messageLabelTextColor: UIColor = UIColor.whiteColor() {
+        didSet {
+            self.messageLabel.textColor = messageLabelTextColor
+            self.messageLabel.setNeedsDisplay()
+        }
+    }
+    
     private(set) lazy var messageLabel: UILabel = {
         var messageLabel = UILabel(frame: .zero)
         messageLabel.numberOfLines = 0
+        messageLabel.textColor = self.messageLabelTextColor
         return messageLabel
     }()
     
     override func calculateSize() -> CGSize {
         switch direction! {
         case .Center:
-            balloonView.layer.cornerRadius = 8
             let constraintSize: CGSize = CGSize(width: balloonWidthMax - balloonContentInsets.left - balloonContentInsets.right, height: CGFloat.max)
             let messageLabelSize: CGSize = messageLabel.sizeThatFits(constraintSize)
             messageLabel.frame = CGRect(x: balloonContentInsets.left, y: balloonContentInsets.top, width: messageLabelSize.width, height: messageLabelSize.height)
             balloonView.frame = CGRect(x: contentInset.left, y: contentInset.top, width: balloonContentInsets.left + messageLabelSize.width + balloonContentInsets.right, height: balloonContentInsets.top + messageLabelSize.height + balloonContentInsets.bottom)
             return CGSize(width: self.bounds.width, height: balloonView.bounds.height)
         case .Left:
-            balloonView.layer.cornerRadius = 8
             let constraintSize: CGSize = CGSize(width: balloonWidthMax - balloonContentInsets.left - balloonContentInsets.right, height: CGFloat.max)
             let messageLabelSize: CGSize = messageLabel.sizeThatFits(constraintSize)
             messageLabel.frame = CGRect(x: balloonContentInsets.left, y: balloonContentInsets.top, width: messageLabelSize.width, height: messageLabelSize.height)
             balloonView.frame = CGRect(x: contentInset.left, y: contentInset.top, width: balloonContentInsets.left + messageLabelSize.width + balloonContentInsets.right, height: balloonContentInsets.top + messageLabelSize.height + balloonContentInsets.bottom)
             return CGSize(width: self.bounds.width, height: balloonView.bounds.height)
         case .Right:
-            balloonView.layer.cornerRadius = 8
             let constraintSize: CGSize = CGSize(width: balloonWidthMax - balloonContentInsets.left - balloonContentInsets.right, height: CGFloat.max)
             let messageLabelSize: CGSize = messageLabel.sizeThatFits(constraintSize)
             messageLabel.frame = CGRect(x: balloonContentInsets.left, y: balloonContentInsets.top, width: messageLabelSize.width, height: messageLabelSize.height)

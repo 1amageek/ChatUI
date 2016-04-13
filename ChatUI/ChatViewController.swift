@@ -103,11 +103,14 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
     
     func collectionView(collectionView: UICollectionView, cellForItemAtIndexPath indexPath: NSIndexPath) -> UICollectionViewCell {
         let transcript = transcripts[indexPath.item]
+        let direction: Direction = directionForTranscript(transcript)
         switch transcript.contentType {
         case ContentType.Text.rawValue:
             let cell: ChatTextViewCell = collectionView.dequeueReusableCellWithReuseIdentifier("ChatTextViewCell", forIndexPath: indexPath) as! ChatTextViewCell
             cell.message = transcript.text
-            cell.direction = transcript.from == "FROM" ? .Right : .Left
+            cell.direction = direction
+            cell.balloonViewColor = direction == .Right ? UIColor(red: 71/255, green: 139/255, blue: 242/255, alpha: 1) : UIColor.lightGrayColor()
+            
             return cell
         default:
             let cell: ChatViewCell = collectionView.dequeueReusableCellWithReuseIdentifier("ChatViewCell", forIndexPath: indexPath) as! ChatViewCell
@@ -122,11 +125,12 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
     
     func collectionView(collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAtIndexPath indexPath: NSIndexPath) -> CGSize {
         let transcript = transcripts[indexPath.item]
+        let direction: Direction = directionForTranscript(transcript)
         switch transcript.contentType {
         case ContentType.Text.rawValue:
             let cell: ChatTextViewCell = ChatTextViewCell(frame: self.view.bounds)
             cell.message = transcript.text
-            cell.direction = transcript.from == "FROM" ? .Right : .Left
+            cell.direction = direction
             return cell.calculateSize()
         default:
             let cell: ChatViewCell = ChatViewCell(frame: self.view.bounds)
@@ -248,6 +252,14 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
         return false
     }
     
+    func directionForTranscript(transcript: Transcript) -> Direction {
+        if transcript.from == "FROM" {
+            return .Right
+        } else {
+            return .Left
+        }
+    }
+    
     func scrollToBottom(animated: Bool) {
         let bottom: CGFloat = inputToolbar.bounds.height + keyboardHeight
         let contentOffset = CGPoint(x: 0, y: self.collectionView.contentSize.height - self.collectionView.bounds.height + bottom)
@@ -273,12 +285,26 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
             self.collectionView.performBatchUpdates({
                 self.collectionView.insertItemsAtIndexPaths([indexPath])
                 }, completion: nil)
+            
+            let transcript = self.transcripts[indexPath.item]
             let layoutAttributes: UICollectionViewLayoutAttributes = self.collectionView.layoutAttributesForItemAtIndexPath(indexPath)!
             let contentInset: UIEdgeInsets = self.collectionView(self.collectionView, layout: self.collectionView.collectionViewLayout, insetForSectionAtIndex: section)
             let bottom: CGFloat = self.inputToolbar.bounds.height + self.keyboardHeight
             let contentOffset = CGPoint(x: 0, y: CGRectGetMaxY(layoutAttributes.frame) + contentInset.bottom - self.collectionView.bounds.height + bottom)
-            UIView.animateWithDuration(0.2) {
-                self.collectionView.contentOffset = contentOffset
+            
+            // DirectionがRightの場合必ずスクロールする
+            if self.directionForTranscript(transcript) == .Right {
+                UIView.animateWithDuration(0.2) {
+                    self.collectionView.contentOffset = contentOffset
+                }
+            }
+            // DirectionがLeftの場合必ず領域内にある場合のみスクロールする
+            else {
+                if self.shouldScrollToBottom() {
+                    UIView.animateWithDuration(0.2) {
+                        self.collectionView.contentOffset = contentOffset
+                    }
+                }
             }
         })
         return realm
