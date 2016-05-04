@@ -12,7 +12,7 @@ let ChatSessionControllerReceiveNotification: String = "inc.stamp.chat.notificat
 
 class ChatSessionController {
     
-    var delegate: ChatSessionControllerDelegate?
+    weak var delegate: ChatSessionControllerDelegate?
 
     init () {
         NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(ChatSessionController.receiveContent(_:)), name: ChatSessionControllerReceiveNotification, object: nil)
@@ -47,6 +47,6 @@ class ChatSessionController {
     
 }
 
-protocol ChatSessionControllerDelegate {
+protocol ChatSessionControllerDelegate: class {
     func controller(controller: ChatSessionController, didReceiveContent transcript: Transcript)
 }

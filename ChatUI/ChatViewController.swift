@@ -9,7 +9,7 @@
 import UIKit
 import RealmSwift
 
-class ChatViewController: UIViewController, UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UITextViewDelegate, ChatSessionControllerDelegate {
+class ChatViewController: UIViewController, UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UITextViewDelegate, ChatSessionControllerDelegate, UIGestureRecognizerDelegate {
     
     var sessionController: ChatSessionController? {
         didSet {
@@ -65,9 +65,15 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
         return sendBarButtonItem
     }()
     
+    private(set) lazy var flexibleBarButtonItem: UIBarButtonItem = {
+        var flexibleBarButtonItem: UIBarButtonItem = UIBarButtonItem(barButtonSystemItem: .FlexibleSpace, target: nil, action: nil)
+        flexibleBarButtonItem.enabled = false
+        return flexibleBarButtonItem
+    }()
+    
     override func viewDidLoad() {
         super.viewDidLoad()
-        self.inputToolbar.setItems([self.sendBarButtonItem], animated: false)
+        self.inputToolbar.setItems([flexibleBarButtonItem, sendBarButtonItem], animated: false)
     }
     
     override func viewWillAppear(animated: Bool) {
@@ -82,7 +88,9 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
         layoutInputToolbar()
         let bottom: CGFloat = inputToolbar.bounds.height + keyboardHeight
         collectionView.contentInset = UIEdgeInsets(top: collectionView.contentInset.top, left: 0, bottom: bottom, right: 0)
-        scrollToBottom(false)
+        if shouldScrollToBottom() {
+            scrollToBottom(false)
+        }
     }
     
     override func viewDidDisappear(animated: Bool) {
@@ -112,7 +120,7 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
             let cell: ChatTextViewCell = collectionView.dequeueReusableCellWithReuseIdentifier("ChatTextViewCell", forIndexPath: indexPath) as! ChatTextViewCell
             cell.message = transcript.text
             cell.direction = direction
-            cell.balloonViewColor = direction == .Right ? UIColor(red: 71/255, green: 139/255, blue: 242/255, alpha: 1) : UIColor(red: 0.9, green: 0.9, blue: 0.9, alpha: 1)
+            cell.balloonViewColor = direction == .Right ? UIColor(red: 71/255, green: 139/255, blue: 250/255, alpha: 1) : UIColor(red: 0.9, green: 0.9, blue: 0.9, alpha: 1)
             cell.messageLabelTextColor = direction == .Right ? UIColor.whiteColor() : UIColor.blackColor()
             
             return cell
@@ -284,58 +292,100 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
     
     // MARK: - Realm
     
-    private(set) var notificationToken: NotificationToken?
-    
     private(set) lazy var realm: Realm = {
         var realm = try! Realm()
-        self.notificationToken = realm.addNotificationBlock({ (notification, realm) in
-            let section: Int = self.numberOfSectionsInCollectionView(self.collectionView) - 1
-            let item: Int = self.collectionView(self.collectionView, numberOfItemsInSection: section) - 1
-            let indexPath: NSIndexPath = NSIndexPath(forItem: item, inSection: section)
-            self.collectionView.performBatchUpdates({
-                self.collectionView.insertItemsAtIndexPaths([indexPath])
-                }, completion: nil)
-            
-            let transcript = self.transcripts[indexPath.item]
-            let layoutAttributes: UICollectionViewLayoutAttributes = self.collectionView.layoutAttributesForItemAtIndexPath(indexPath)!
-            let contentInset: UIEdgeInsets = self.collectionView(self.collectionView, layout: self.collectionView.collectionViewLayout, insetForSectionAtIndex: section)
-            let bottom: CGFloat = self.inputToolbar.bounds.height + self.keyboardHeight
-            let contentOffset = CGPoint(x: 0, y: CGRectGetMaxY(layoutAttributes.frame) + contentInset.bottom - self.collectionView.bounds.height + bottom)
-            
-            // DirectionがRightの場合必ずスクロールする
-            if self.directionForTranscript(transcript) == .Right {
-                UIView.animateWithDuration(0.2) {
-                    self.collectionView.contentOffset = contentOffset
-                }
-            }
-            // DirectionがLeftの場合必ず領域内にある場合のみスクロールする
-            else {
-                if self.shouldScrollToBottom() {
-                    UIView.animateWithDuration(0.2) {
-                        self.collectionView.contentOffset = contentOffset
-                    }
-                }
-            }
-        })
         return realm
     }()
     
+    private(set) var notificationToken: NotificationToken?
     private(set) lazy var transcripts: Results<Transcript> = {
-        var transcripts = self.realm.objects(Transcript).sorted("createdAt")
+        var transcripts: Results<Transcript> = self.realm.objects(Transcript).sorted("createdAt")
+        self.notificationToken = transcripts.addNotificationBlock({ [weak self] (changes: RealmCollectionChange) in
+            guard let collectionView = self?.collectionView else { return }
+            
+            switch changes {
+            case .Initial:
+                
+                collectionView.reloadData()
+                
+                break
+            case .Update(_, let deletions, let insertions, let modifications):
+                collectionView.performBatchUpdates({
+                    collectionView.insertItemsAtIndexPaths(insertions.map { NSIndexPath(forRow: $0, inSection: 0) })
+                    collectionView.deleteItemsAtIndexPaths(deletions.map { NSIndexPath(forRow: $0, inSection: 0) })
+                    collectionView.reloadItemsAtIndexPaths(modifications.map { NSIndexPath(forRow: $0, inSection: 0) })
+                    }, completion: nil)
+                
+                guard let item: Int = insertions.last else { return }
+                guard var section: Int = self?.numberOfSectionsInCollectionView(collectionView) else { return }
+                section = section - 1
+                let indexPath: NSIndexPath = NSIndexPath(forItem: item, inSection: section)
+                let transcript = transcripts[indexPath.item]
+                let layoutAttributes: UICollectionViewLayoutAttributes = collectionView.layoutAttributesForItemAtIndexPath(indexPath)!
+                guard let contentInset: UIEdgeInsets = self?.collectionView(collectionView, layout: collectionView.collectionViewLayout, insetForSectionAtIndex: section) else {
+                    return
+                }
+                let bottom: CGFloat = (self?.inputToolbar.bounds.height ?? 0) + (self?.keyboardHeight ?? 0)
+                let contentOffset = CGPoint(x: 0, y: CGRectGetMaxY(layoutAttributes.frame) + contentInset.bottom - collectionView.bounds.height + bottom)
+                
+                // DirectionがRightの場合必ずスクロールする
+                if self?.directionForTranscript(transcript) == .Right {
+                    UIView.animateWithDuration(0.2) {
+                        self?.collectionView.contentOffset = contentOffset
+                    }
+                }
+                    // DirectionがLeftの場合必ず領域内にある場合のみスクロールする
+                else {
+                    guard let shouldScrollToBottom: Bool = self?.shouldScrollToBottom() else  { return }
+                    if shouldScrollToBottom {
+                        UIView.animateWithDuration(0.2) {
+                            self?.collectionView.contentOffset = contentOffset
+                        }
+                    }
+                }
+                
+                break
+            case .Error(let error):
+                fatalError("\(error)")
+                break
+            }
+        })
+        
         return transcripts
     }()
     
     // MARK: - Gesture control
     
-    private(set) lazy var panGestureRecognizer: UIPanGestureRecognizer = {
-        var panGestureRecognizer = UIPanGestureRecognizer(target: self, action: #selector(ChatViewController.panGesture(_:)))
-        return panGestureRecognizer
-    }()
+//    private(set) lazy var panGestureRecognizer: UIPanGestureRecognizer = {
+//        var panGestureRecognizer = UIPanGestureRecognizer(target: self, action: #selector(ChatViewController.panGesture(_:)))
+//        panGestureRecognizer.delegate = self
+//        return panGestureRecognizer
+//    }()
+//    
+//    func panGesture(recognizer: UIPanGestureRecognizer) {
+//        if recognizer.state == UIGestureRecognizerState.Changed {
+//            let translation = recognizer.translationInView(self.view)
+//            print(translation)
+//        }
+//    }
     
-    func panGesture(recognizer: UIPanGestureRecognizer) {
-        print(recognizer)
-    }
+//    func gestureRecognizer(gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWithGestureRecognizer otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+//        if (gestureRecognizer == self.panGestureRecognizer && otherGestureRecognizer == self.collectionView.panGestureRecognizer) ||
+//            (otherGestureRecognizer == self.panGestureRecognizer && gestureRecognizer == self.collectionView.panGestureRecognizer) {
+//            return true
+//        }
+//        return false
+//    }
+//    
+//    func gestureRecognizer(gestureRecognizer: UIGestureRecognizer, shouldRequireFailureOfGestureRecognizer otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+//        if (gestureRecognizer == self.panGestureRecognizer && otherGestureRecognizer == self.collectionView.panGestureRecognizer) ||
+//            (otherGestureRecognizer == self.panGestureRecognizer && gestureRecognizer == self.collectionView.panGestureRecognizer) {
+//            return true
+//        }
+//        return false
+//    }
     
+
     // MARK: - ChatSessionControllerDelegate
     
     func controller(controller: ChatSessionController, didReceiveContent transcript: Transcript) {
@@ -348,7 +398,7 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
     
     deinit {
         if let notificationToken = self.notificationToken {
-            self.realm.removeNotification(notificationToken)
+            notificationToken.stop()
         }
     }
     
