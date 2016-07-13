@@ -1,3 +1,6 @@
 use_frameworks!
 
-pod 'RealmSwift'
+
+target 'ChatUI' do 
+	pod 'Firebase'
+end

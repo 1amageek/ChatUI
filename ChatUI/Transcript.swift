@@ -6,6 +6,7 @@
 //  Copyright © 2016年 Stamp inc. All rights reserved.
 //
 
+import Realm
 import RealmSwift
 
 enum ContentType: Int {

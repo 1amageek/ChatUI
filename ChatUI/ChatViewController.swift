@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import Realm
 import RealmSwift
 
 class ChatViewController: UIViewController, UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UITextViewDelegate, ChatSessionControllerDelegate, UIGestureRecognizerDelegate {
@@ -55,8 +56,6 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
         self.view.backgroundColor = UIColor.whiteColor()
         self.view.addSubview(self.collectionView)
         self.view.addSubview(self.inputToolbar)
-//        self.collectionView.addGestureRecognizer(self.panGestureRecognizer)
-//        self.panGestureRecognizer.requireGestureRecognizerToFail(self.collectionView.panGestureRecognizer)
     }
     
     private(set) lazy var sendBarButtonItem: UIBarButtonItem = {
@@ -299,7 +298,7 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
     
     private(set) var notificationToken: NotificationToken?
     private(set) lazy var transcripts: Results<Transcript> = {
-        var transcripts: Results<Transcript> = self.realm.objects(Transcript).sorted("createdAt")
+        var transcripts: Results<Transcript> = self.realm.objects(Transcript).sorted("createdAt")    
         self.notificationToken = transcripts.addNotificationBlock({ [weak self] (changes: RealmCollectionChange) in
             guard let collectionView = self?.collectionView else { return }
             
@@ -354,38 +353,6 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
         return transcripts
     }()
     
-    // MARK: - Gesture control
-    
-//    private(set) lazy var panGestureRecognizer: UIPanGestureRecognizer = {
-//        var panGestureRecognizer = UIPanGestureRecognizer(target: self, action: #selector(ChatViewController.panGesture(_:)))
-//        panGestureRecognizer.delegate = self
-//        return panGestureRecognizer
-//    }()
-//    
-//    func panGesture(recognizer: UIPanGestureRecognizer) {
-//        if recognizer.state == UIGestureRecognizerState.Changed {
-//            let translation = recognizer.translationInView(self.view)
-//            print(translation)
-//        }
-//    }
-    
-//    func gestureRecognizer(gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWithGestureRecognizer otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-//        if (gestureRecognizer == self.panGestureRecognizer && otherGestureRecognizer == self.collectionView.panGestureRecognizer) ||
-//            (otherGestureRecognizer == self.panGestureRecognizer && gestureRecognizer == self.collectionView.panGestureRecognizer) {
-//            return true
-//        }
-//        return false
-//    }
-//    
-//    func gestureRecognizer(gestureRecognizer: UIGestureRecognizer, shouldRequireFailureOfGestureRecognizer otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-//        if (gestureRecognizer == self.panGestureRecognizer && otherGestureRecognizer == self.collectionView.panGestureRecognizer) ||
-//            (otherGestureRecognizer == self.panGestureRecognizer && gestureRecognizer == self.collectionView.panGestureRecognizer) {
-//            return true
-//        }
-//        return false
-//    }
-    
-
     // MARK: - ChatSessionControllerDelegate
     
     func controller(controller: ChatSessionController, didReceiveContent transcript: Transcript) {
