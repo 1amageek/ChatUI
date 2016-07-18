@@ -27,3 +27,4 @@ xcuserdata
 *.moved-aside
 *.xcuserstate
 ChatUI/GoogleService-Info.plist
+ChatUI/GoogleService/

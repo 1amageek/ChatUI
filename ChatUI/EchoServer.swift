@@ -8,6 +8,8 @@
 
 import Foundation
 
+let EchoServerReceiveNotification: String = "EchoServerReceiveNotification"
+
 class EchoServer {
     
     func post(message: String) {
@@ -21,7 +23,7 @@ class EchoServer {
                     "from": "OTHER",
                     "text": message
                 ]
-                NSNotificationCenter.defaultCenter().postNotificationName(ChatSessionControllerReceiveNotification, object: nil, userInfo: transcript)
+                NSNotificationCenter.defaultCenter().postNotificationName(EchoServerReceiveNotification, object: nil, userInfo: transcript)
                 
             })
         }

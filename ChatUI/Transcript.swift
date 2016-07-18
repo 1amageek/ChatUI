@@ -30,4 +30,8 @@ class Transcript: Object {
     dynamic var text: String?
     //dynamic var location: [Double]?
 
+    override static func primaryKey() -> String? {
+        return "id"
+    }
+    
 }

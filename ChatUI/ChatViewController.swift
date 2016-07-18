@@ -83,10 +83,11 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        self.collectionView.frame = self.view.bounds
         layoutInputToolbar()
         let bottom: CGFloat = inputToolbar.bounds.height + keyboardHeight
-        collectionView.contentInset = UIEdgeInsets(top: collectionView.contentInset.top, left: 0, bottom: bottom, right: 0)
+        let frame: CGRect = UIEdgeInsetsInsetRect(self.view.bounds, UIEdgeInsets(top: 0, left: 0, bottom: bottom, right: 0))
+        self.collectionView.frame = frame
+//        collectionView.contentInset = UIEdgeInsets(top: collectionView.contentInset.top, left: 0, bottom: bottom, right: 0)
         if shouldScrollToBottom() {
             scrollToBottom(false)
         }
@@ -181,6 +182,7 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
             //transcript.to = ["TO"]
             transcript.contentType = ContentType.Text.rawValue
             transcript.text = text
+            transcript.id = NSUUID().UUIDString
             try! realm.write({
                 realm.add(transcript)
             })
@@ -247,10 +249,14 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
     
     // MARK: - CollectionView offset control
     
+    var isSmallContentSize: Bool {
+        return self.collectionView.bounds.height > self.collectionView.contentSize.height
+    }
+    
     func shouldScrollToBottom() -> Bool {
-        if collectionView.bounds.height > collectionView.contentSize.height {
-            return false
-        }
+        
+        // コンテンツサイズが画面サイズより小さい時はスクロールしない
+        if isSmallContentSize { return false }
         let section: Int = self.numberOfSectionsInCollectionView(self.collectionView) - 1
         if section < 0 {
             return false
@@ -329,11 +335,16 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
                 
                 // DirectionがRightの場合必ずスクロールする
                 if self?.directionForTranscript(transcript) == .Right {
-                    UIView.animateWithDuration(0.2) {
-                        self?.collectionView.contentOffset = contentOffset
+                    if let isSmallContentSize: Bool = self?.isSmallContentSize {
+                        if !isSmallContentSize {
+                            UIView.animateWithDuration(0.2) {
+                                self?.collectionView.contentOffset = contentOffset
+                            }
+                        }
                     }
                 }
-                    // DirectionがLeftの場合必ず領域内にある場合のみスクロールする
+                
+                // DirectionがLeftの場合必ず領域内にある場合のみスクロールする
                 else {
                     guard let shouldScrollToBottom: Bool = self?.shouldScrollToBottom() else  { return }
                     if shouldScrollToBottom {
@@ -357,7 +368,7 @@ class ChatViewController: UIViewController, UICollectionViewDelegate, UICollecti
     
     func controller(controller: ChatSessionController, didReceiveContent transcript: Transcript) {
         try! realm.write({
-            realm.add(transcript)
+            realm.add(transcript, update: true)
         })
     }
     

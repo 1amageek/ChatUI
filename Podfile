@@ -1,6 +1,5 @@
 use_frameworks!
 
-
 target 'ChatUI' do 
-	pod 'Firebase'
+	pod 'Firebase/Database'
 end
